@@ -27,6 +27,7 @@
 #include "flatpak-auth-private.h"
 #include "flatpak-error.h"
 #include "flatpak-installation-private.h"
+#include "flatpak-progress-private.h"
 #include "flatpak-transaction-private.h"
 #include "flatpak-utils-private.h"
 
@@ -204,14 +205,7 @@ struct _FlatpakTransactionProgress
 {
   GObject              parent;
 
-  OstreeAsyncProgress *ostree_progress;
-  char                *status;
-  gboolean             estimating;
-  int                  progress;
-  guint64              total_transferred;
-  guint64              start_time;
-
-  gboolean             done;
+  FlatpakProgress     *progress_obj;
 };
 
 enum {
@@ -271,7 +265,7 @@ void
 flatpak_transaction_progress_set_update_frequency (FlatpakTransactionProgress *self,
                                                    guint                       update_interval)
 {
-  g_object_set_data (G_OBJECT (self->ostree_progress), "update-interval", GUINT_TO_POINTER (update_interval));
+  flatpak_progress_set_update_interval (self->progress_obj, update_interval);
 }
 
 /**
@@ -285,7 +279,7 @@ flatpak_transaction_progress_set_update_frequency (FlatpakTransactionProgress *s
 char *
 flatpak_transaction_progress_get_status (FlatpakTransactionProgress *self)
 {
-  return g_strdup (self->status);
+  return g_strdup (flatpak_progress_get_status (self->progress_obj));
 }
 
 /**
@@ -299,7 +293,7 @@ flatpak_transaction_progress_get_status (FlatpakTransactionProgress *self)
 gboolean
 flatpak_transaction_progress_get_is_estimating (FlatpakTransactionProgress *self)
 {
-  return self->estimating;
+  return flatpak_progress_get_estimating (self->progress_obj);
 }
 
 /**
@@ -313,7 +307,7 @@ flatpak_transaction_progress_get_is_estimating (FlatpakTransactionProgress *self
 int
 flatpak_transaction_progress_get_progress (FlatpakTransactionProgress *self)
 {
-  return self->progress;
+  return flatpak_progress_get_progress (self->progress_obj);
 }
 
 /**
@@ -328,7 +322,12 @@ flatpak_transaction_progress_get_progress (FlatpakTransactionProgress *self)
 guint64
 flatpak_transaction_progress_get_bytes_transferred (FlatpakTransactionProgress *self)
 {
-  return self->total_transferred;
+  guint64 bytes_transferred, transferred_extra_data_bytes;
+
+  bytes_transferred = flatpak_progress_get_bytes_transferred (self->progress_obj);
+  transferred_extra_data_bytes = flatpak_progress_get_transferred_extra_data_bytes (self->progress_obj);
+
+  return bytes_transferred + transferred_extra_data_bytes;
 }
 
 /**
@@ -343,7 +342,7 @@ flatpak_transaction_progress_get_bytes_transferred (FlatpakTransactionProgress *
 guint64
 flatpak_transaction_progress_get_start_time (FlatpakTransactionProgress *self)
 {
-  return self->start_time;
+  return flatpak_progress_get_start_time (self->progress_obj);
 }
 
 static void
@@ -351,8 +350,7 @@ flatpak_transaction_progress_finalize (GObject *object)
 {
   FlatpakTransactionProgress *self = (FlatpakTransactionProgress *) object;
 
-  g_free (self->status);
-  g_object_unref (self->ostree_progress);
+  g_object_unref (self->progress_obj);
 
   G_OBJECT_CLASS (flatpak_transaction_progress_parent_class)->finalize (object);
 }
@@ -381,46 +379,26 @@ flatpak_transaction_progress_class_init (FlatpakTransactionProgressClass *klass)
 }
 
 static void
-got_progress_cb (const char *status,
-                 guint       progress,
-                 gboolean    estimating,
-                 gpointer    user_data)
+got_progress_cb (FlatpakProgress *progress_obj,
+                 gpointer         user_data)
 {
   FlatpakTransactionProgress *p = user_data;
-  guint64 bytes_transferred;
-  guint64 transferred_extra_data_bytes;
-  guint64 start_time;
 
-  ostree_async_progress_get (p->ostree_progress,
-                             "bytes-transferred", "t", &bytes_transferred,
-                             "transferred-extra-data-bytes", "t", &transferred_extra_data_bytes,
-                             "start-time", "t", &start_time,
-                             NULL);
-
-  g_free (p->status);
-  p->status = g_strdup (status);
-  p->progress = progress;
-  p->estimating = estimating;
-  p->total_transferred = bytes_transferred + transferred_extra_data_bytes;
-  p->start_time = start_time;
-
-  if (!p->done)
+  if (!flatpak_progress_is_done (p->progress_obj))
     g_signal_emit (p, progress_signals[CHANGED], 0);
 }
 
 static void
 flatpak_transaction_progress_init (FlatpakTransactionProgress *self)
 {
-  self->status = g_strdup ("Initializing");
-  self->estimating = TRUE;
-  self->ostree_progress = flatpak_progress_new (got_progress_cb, self);
+  self->progress_obj = flatpak_progress_new (got_progress_cb, self, NULL);
+  flatpak_progress_init_initializing (self->progress_obj);
 }
 
 static void
 flatpak_transaction_progress_done (FlatpakTransactionProgress *self)
 {
-  ostree_async_progress_finish (self->ostree_progress);
-  self->done = TRUE;
+  flatpak_progress_done (self->progress_obj);
 }
 
 static FlatpakTransactionProgress *
@@ -3522,7 +3500,7 @@ _run_op_kind (FlatpakTransaction           *self,
                                    (const char **) op->subpaths,
                                    (const char **) op->previous_ids,
                                    op->resolved_token,
-                                   progress->ostree_progress,
+                                   progress->progress_obj,
                                    cancellable, error);
 
       flatpak_transaction_progress_done (progress);
@@ -3572,7 +3550,7 @@ _run_op_kind (FlatpakTransaction           *self,
                                       (const char **) op->subpaths,
                                       (const char **) op->previous_ids,
                                       op->resolved_token,
-                                      progress->ostree_progress,
+                                      progress->progress_obj,
                                       cancellable, &local_error);
           flatpak_transaction_progress_done (progress);
 

@@ -25,6 +25,7 @@
 
 #include "flatpak-common-types-private.h"
 #include "flatpak-context-private.h"
+#include "flatpak-progress-private.h"
 #include "libglnx/libglnx.h"
 
 /* Version history:
@@ -551,7 +552,7 @@ gboolean    flatpak_dir_update_appstream (FlatpakDir          *self,
                                           const char          *remote,
                                           const char          *arch,
                                           gboolean            *out_changed,
-                                          OstreeAsyncProgress *progress,
+                                          FlatpakProgress     *progress,
                                           GCancellable        *cancellable,
                                           GError             **error);
 gboolean    flatpak_dir_pull (FlatpakDir                           *self,
@@ -564,7 +565,7 @@ gboolean    flatpak_dir_pull (FlatpakDir                           *self,
                               OstreeRepo                           *repo,
                               FlatpakPullFlags                      flatpak_flags,
                               OstreeRepoPullFlags                   flags,
-                              OstreeAsyncProgress                  *progress,
+                              FlatpakProgress                      *progress,
                               GCancellable                         *cancellable,
                               GError                              **error);
 gboolean    flatpak_dir_pull_untrusted_local (FlatpakDir          *self,
@@ -572,7 +573,7 @@ gboolean    flatpak_dir_pull_untrusted_local (FlatpakDir          *self,
                                               const char          *remote_name,
                                               const char          *ref,
                                               const char         **subpaths,
-                                              OstreeAsyncProgress *progress,
+                                              FlatpakProgress     *progress,
                                               GCancellable        *cancellable,
                                               GError             **error);
 gboolean    flatpak_dir_list_refs_for_name (FlatpakDir   *self,
@@ -666,7 +667,7 @@ gboolean   flatpak_dir_install (FlatpakDir          *self,
                                 const char         **subpaths,
                                 const char         **previous_ids,
                                 const char          *token,
-                                OstreeAsyncProgress *progress,
+                                FlatpakProgress     *progress,
                                 GCancellable        *cancellable,
                                 GError             **error);
 char *flatpak_dir_ensure_bundle_remote (FlatpakDir   *self,
@@ -712,7 +713,7 @@ gboolean   flatpak_dir_update (FlatpakDir                           *self,
                                const char                          **opt_subpaths,
                                const char                          **opt_previous_ids,
                                const char                           *token,
-                               OstreeAsyncProgress                  *progress,
+                               FlatpakProgress                      *progress,
                                GCancellable                         *cancellable,
                                GError                              **error);
 gboolean flatpak_dir_uninstall (FlatpakDir                 *self,

@@ -608,11 +608,6 @@ get_file_age (GFile *file)
   return (guint64) (now - mtime);
 }
 
-static void
-no_progress_cb (OstreeAsyncProgress *progress, gpointer user_data)
-{
-}
-
 static guint64
 get_appstream_timestamp (FlatpakDir *dir,
                          const char *remote,
@@ -639,7 +634,6 @@ update_appstream (GPtrArray    *dirs,
                   GError      **error)
 {
   gboolean changed;
-  gboolean res;
   int i, j;
 
   g_return_val_if_fail (dirs != NULL, FALSE);
@@ -661,7 +655,6 @@ update_appstream (GPtrArray    *dirs,
           for (i = 0; remotes[i] != NULL; i++)
             {
               g_autoptr(GError) local_error = NULL;
-              g_autoptr(OstreeAsyncProgress) progress = NULL;
               guint64 ts_file_age;
 
               ts_file_age = get_appstream_timestamp (dir, remotes[i], arch);
@@ -697,16 +690,15 @@ update_appstream (GPtrArray    *dirs,
                       g_print ("\n");
                     }
                 }
-              progress = ostree_async_progress_new_and_connect (no_progress_cb, NULL);
               if (!flatpak_dir_update_appstream (dir, remotes[i], arch, &changed,
-                                                 progress, cancellable, &local_error))
+                                                 /* progress = */ NULL,
+                                                 cancellable, &local_error))
                 {
                   if (quiet)
                     g_debug ("%s: %s", _("Error updating"), local_error->message);
                   else
                     g_printerr ("%s: %s\n", _("Error updating"), local_error->message);
                 }
-              ostree_async_progress_finish (progress);
             }
         }
     }
@@ -720,7 +712,6 @@ update_appstream (GPtrArray    *dirs,
 
           if (flatpak_dir_has_remote (dir, remote, NULL))
             {
-              g_autoptr(OstreeAsyncProgress) progress = NULL;
               guint64 ts_file_age;
 
               found = TRUE;
@@ -734,11 +725,9 @@ update_appstream (GPtrArray    *dirs,
               else
                 g_debug ("%s:%s appstream age %" G_GUINT64_FORMAT " is greater than ttl %" G_GUINT64_FORMAT, remote, arch, ts_file_age, ttl);
 
-              progress = ostree_async_progress_new_and_connect (no_progress_cb, NULL);
-              res = flatpak_dir_update_appstream (dir, remote, arch, &changed,
-                                                  progress, cancellable, error);
-              ostree_async_progress_finish (progress);
-              if (!res)
+              if (!flatpak_dir_update_appstream (dir, remote, arch, &changed,
+                                                 /* progress = */ NULL,
+                                                cancellable, error))
                 return FALSE;
             }
         }

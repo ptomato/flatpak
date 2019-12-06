@@ -805,28 +805,6 @@ void flatpak_format_choices (const char **choices,
                              const char  *prompt,
                              ...) G_GNUC_PRINTF (2, 3);
 
-typedef void (*FlatpakProgressCallback)(const char *status,
-                                        guint       progress,
-                                        gboolean    estimating,
-                                        gpointer    user_data);
-
-OstreeAsyncProgress *flatpak_progress_new (FlatpakProgressCallback progress,
-                                           gpointer                progress_data);
-
-OstreeAsyncProgress *flatpak_progress_chain (OstreeAsyncProgress *progress);
-
-static inline void
-flatpak_progress_unchain (OstreeAsyncProgress *chained_progress)
-{
-#if OSTREE_CHECK_VERSION (2019, 6)
-  if (chained_progress != NULL)
-    ostree_async_progress_finish (chained_progress);
-#endif
-}
-
-typedef OstreeAsyncProgress FlatpakAsyncProgressChained;
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (FlatpakAsyncProgressChained, flatpak_progress_unchain);
-
 void flatpak_log_dir_access (FlatpakDir *dir);
 
 gboolean flatpak_check_required_version (const char *ref,
